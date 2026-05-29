@@ -2,7 +2,7 @@ import type { DeparturesResponse, StationCode } from './stations'
 import { MOCK_TRAINS } from './mockData'
 
 const USE_MOCK = (import.meta as unknown as { env: Record<string, string> }).env.VITE_USE_MOCK === 'true'
-const API_BASE = '/.amplify/functions/departures'
+const API_BASE = 'https://7wv7k35ssb.execute-api.eu-west-2.amazonaws.com'
 
 export async function fetchDepartures(
   from: StationCode,
