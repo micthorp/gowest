@@ -27,7 +27,15 @@ export function RecommendationCard({ label, train }: Props) {
 
   const opClass = train.operator === 'GWR' ? 'op-gwr' : 'op-eliz'
   const destName = STATIONS[train.to]?.name ?? train.to
-
+  const estimatedArrival = (() => {
+  if (train.estimatedArrival) return train.estimatedArrival
+  if (train.estimatedDeparture && train.durationMinutes) {
+    const [h, m] = train.estimatedDeparture.split(':').map(Number)
+    const total = h * 60 + m + train.durationMinutes
+    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+  }
+  return null
+})()
   return (
     <div className="rec-card">
       <div className="rec-label">Best option now</div>
@@ -40,7 +48,7 @@ export function RecommendationCard({ label, train }: Props) {
         <div className="rec-time">{formatTime(train.estimatedDeparture)}</div>
       </div>
       <div className="rec-meta">
-        Arrives {destName} {formatTime(train.estimatedArrival ?? train.scheduledArrival ?? '')}
+        Arrives {destName} {estimatedArrival ?? '--:--'}
       </div>
       <div className="rec-pills">
         <span className={`pill ${train.isFast ? 'pill-fast' : 'pill-slow'}`}>
