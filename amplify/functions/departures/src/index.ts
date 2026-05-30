@@ -1,190 +1,138 @@
-/**
- * GoWest — Amplify Lambda function
- * Proxies requests to the RTT NG API.
- * Token never leaves this function; never exposed to the browser.
- *
- * Endpoint: GET /.amplify/functions/departures?from=ZFD&to=MAI
- */
-
 const ALLOWED_STATIONS = new Set(['ZFD', 'PAD', 'MAI', 'RDG'])
 const RTT_BASE = 'https://data.rtt.io'
 
-// ATOC codes for operators we care about
-const OPERATOR_MAP: Record<string, string> = {
-  GW: 'GWR',
-  XR: 'Elizabeth',
-  TL: 'Elizabeth', // Thameslink occasionally appears
-}
+let cachedAccessToken: string | null = null
+let cachedTokenExpiry: number | null = null
 
-interface RTTService {
-  serviceUid: string
-  atocCode: string
-  atocName: string
-  locationDetail: {
-    gbttBookedDeparture: string
-    realtimeDeparture?: string
-    realtimeDepartureActual?: boolean
-    gbttBookedArrival?: string
-    realtimeArrival?: string
-    platform?: string
-    platformConfirmed?: boolean
-    displayAs?: string
-    origin: Array<{ description: string; publicTime: string }>
-    destination: Array<{ description: string; publicTime: string }>
+async function getAccessToken(refreshToken: string): Promise<string> {
+  if (cachedAccessToken && cachedTokenExpiry && Date.now() < cachedTokenExpiry - 60_000) {
+    return cachedAccessToken
   }
-  runDate: string
-  locations?: Array<{ crs?: string; description: string }>
+  const res = await fetch(`${RTT_BASE}/api/get_access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${refreshToken}` },
+  })
+  if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`)
+  const data = await res.json() as { token: string; validUntil: string }
+  cachedAccessToken = data.token
+  cachedTokenExpiry = new Date(data.validUntil).getTime()
+  return cachedAccessToken
 }
 
-interface RTTResponse {
-  services?: RTTService[]
-  location?: { name: string; crs: string }
+function typicalDuration(operator: string, from: string, to: string): number | undefined {
+  if (from === 'PAD' || from === 'ZFD') {
+    if (to === 'MAI') return operator === 'GWR' ? 23 : 47
+    if (to === 'RDG') return operator === 'GWR' ? 32 : 65
+  }
+  if (to === 'PAD') {
+    if (from === 'MAI') return operator === 'GWR' ? 23 : 47
+    if (from === 'RDG') return operator === 'GWR' ? 32 : 65
+  }
+  return undefined
 }
 
-function formatHHMM(raw: string | undefined): string {
-  if (!raw) return ''
-  // RTT NG returns ISO-8601; old API returned HHMM — handle both
-  if (raw.includes('T')) {
-    const d = new Date(raw)
+function toHHMM(isoString: string | undefined): string {
+  if (!isoString) return ''
+  try {
+    const d = new Date(isoString)
     return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })
-  }
-  if (raw.length === 4) return `${raw.slice(0, 2)}:${raw.slice(2)}`
-  return raw
+  } catch { return '' }
 }
 
-function parseDuration(dep: string, arr: string | undefined): number | undefined {
-  if (!arr || !dep) return undefined
+function delayMins(scheduled: string | undefined, actual: string | undefined): number {
+  if (!scheduled || !actual) return 0
   try {
-    const [dh, dm] = dep.split(':').map(Number)
-    const [ah, am] = arr.split(':').map(Number)
-    const diff = (ah * 60 + am) - (dh * 60 + dm)
-    return diff > 0 ? diff : undefined
-  } catch { return undefined }
-}
-
-function deriveStatus(scheduledDep: string, estimatedDep: string | undefined) {
-  if (!estimatedDep || estimatedDep === scheduledDep) {
-    return { status: 'on_time' as const, delayMinutes: 0 }
-  }
-  try {
-    const [sh, sm] = scheduledDep.split(':').map(Number)
-    const [eh, em] = estimatedDep.split(':').map(Number)
-    const diff = (eh * 60 + em) - (sh * 60 + sm)
-    if (diff > 0) return { status: 'delayed' as const, delayMinutes: diff }
-  } catch { /* fall through */ }
-  return { status: 'on_time' as const, delayMinutes: 0 }
-}
-
-function isFastService(service: RTTService, from: string, to: string): boolean {
-  const locs = service.locations ?? []
-  // Fast if ≤ 3 intermediate stops between our from and to
-  const fromIdx = locs.findIndex(l => l.crs === from)
-  const toIdx = locs.findIndex(l => l.crs === to)
-  if (fromIdx === -1 || toIdx === -1) return true // unknown, assume fast
-  return (toIdx - fromIdx) <= 3
-}
-
-function terminatesPaddington(service: RTTService, to: string): boolean {
-  if (to === 'PAD') return false
-  const dest = service.locationDetail.destination
-  return dest.some(d => d.description.toLowerCase().includes('paddington'))
+    const diff = Math.round((new Date(actual).getTime() - new Date(scheduled).getTime()) / 60000)
+    return diff > 0 ? diff : 0
+  } catch { return 0 }
 }
 
 export const handler = async (event: {
-  queryStringParameters?: Record<string, string>
   httpMethod?: string
+  queryStringParameters?: Record<string, string>
 }) => {
   const headers = {
     'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,OPTIONS',
     'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'no-referrer',
   }
 
-  if (event.httpMethod && event.httpMethod !== 'GET') {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' }
   }
 
-  const { from, to } = event.queryStringParameters ?? {}
+  const params = event.queryStringParameters ?? {}
+  const { from, to } = params
 
   if (!from || !to || !ALLOWED_STATIONS.has(from) || !ALLOWED_STATIONS.has(to) || from === to) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: 'Invalid station codes' }),
-    }
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid station codes' }) }
   }
 
-  const token = process.env.RTT_API_TOKEN
-  if (!token) {
+  const refreshToken = process.env.RTT_API_TOKEN
+  if (!refreshToken) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'API token not configured' }) }
   }
 
   try {
-    // RTT NG departures endpoint: /api/v1/gb/station/{crs}/departures/to/{dest}
-    const rttUrl = `${RTT_BASE}/api/v1/gb/station/${from}/departures/to/${to}`
+    const accessToken = await getAccessToken(refreshToken)
 
-    const rttRes = await fetch(rttUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
+    const url = new URL(`${RTT_BASE}/gb-nr/location`)
+    url.searchParams.set('code', from)
+    url.searchParams.set('filterTo', to)
+    url.searchParams.set('timeWindow', '120')
+
+    const rttRes = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
     })
 
     if (!rttRes.ok) {
       const text = await rttRes.text()
       console.error('RTT error', rttRes.status, text)
-      return {
-        statusCode: 502,
-        headers,
-        body: JSON.stringify({ error: `RTT API error: ${rttRes.status}` }),
-      }
+      return { statusCode: 502, headers, body: JSON.stringify({ error: `RTT API error: ${rttRes.status}` }) }
     }
 
-    const rttData: RTTResponse = await rttRes.json()
+    const rttData = await rttRes.json() as { services?: Record<string, unknown>[] }
     const services = rttData.services ?? []
 
     const trains = services
-      .filter(s => s.locationDetail.displayAs !== 'CANCELLED_CALL')
+      .filter((s: any) => s.temporalData?.departure?.isCancelled !== true)
       .slice(0, 8)
-      .map(s => {
-        const ld = s.locationDetail
-        const scheduledDep = formatHHMM(ld.gbttBookedDeparture)
-        const estimatedDep = formatHHMM(ld.realtimeDeparture) || scheduledDep
-        const scheduledArr = formatHHMM(ld.gbttBookedArrival)
-        const estimatedArr = formatHHMM(ld.realtimeArrival) || scheduledArr
-        const { status, delayMinutes } = deriveStatus(scheduledDep, estimatedDep)
-        const operator = OPERATOR_MAP[s.atocCode] ?? 'Other'
+      .map((s: any) => {
+        const dep = s.temporalData?.departure
+        const plat = s.locationMetadata?.platform
+        const sched = dep?.scheduleAdvertised
+        const actual = dep?.realtimeEstimate ?? dep?.realtimeForecast ?? dep?.realtimeActual
+        const schedDep = toHHMM(sched)
+        const estDep = toHHMM(actual) || schedDep
+        const delay = delayMins(sched, actual)
+        const destLocation = s.destination?.[0]?.location
+        const operator = s.scheduleMetadata?.operator?.code ?? 'Other'
+
+        const operatorName =
+          operator === 'GW' ? 'GWR' :
+          operator === 'XR' ? 'Elizabeth' :
+          operator === 'TL' ? 'Elizabeth' : 'Other'
+
+        const isCancelled = dep?.isCancelled === true
+        const status = isCancelled ? 'cancelled' : delay > 0 ? 'delayed' : 'on_time'
 
         return {
-          id: `${s.serviceUid}-${s.runDate}`,
-          operator,
+          id: s.scheduleMetadata?.uniqueIdentity ?? Math.random().toString(),
+          operator: operatorName,
           from,
           to,
-          scheduledDeparture: scheduledDep,
-          estimatedDeparture: estimatedDep,
-          scheduledArrival: scheduledArr,
-          estimatedArrival: estimatedArr,
-          durationMinutes: parseDuration(estimatedDep, estimatedArr),
-          platform: ld.platform ?? undefined,
-          status: s.locationDetail.displayAs === 'CANCELLED_CALL' ? 'cancelled' : status,
-          delayMinutes,
-          destinationName: ld.destination[0]?.description,
-          isFast: isFastService(s, from, to),
-          terminatesPaddington: terminatesPaddington(s, to),
+          scheduledDeparture: schedDep,
+          estimatedDeparture: estDep,
+          durationMinutes: typicalDuration(operatorName, from, to),
+          platform: plat?.actual ?? plat?.forecast ?? plat?.planned ?? undefined,
+          status,
+          delayMinutes: delay,
+          destinationName: destLocation?.description,
+          isFast: true,
+          terminatesPaddington: destLocation?.shortCodes?.includes('PAD') && to !== 'PAD',
         }
       })
 
     return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ trains, fetchedAt: new Date().toISOString() }),
-    }
-  } catch (err) {
-    console.error('Function error:', err)
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Internal error' }),
-    }
-  }
-}
+      statusCode: 20
