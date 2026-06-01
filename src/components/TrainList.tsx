@@ -40,10 +40,17 @@ export function TrainList({ trains, bestId }: Props) {
                 {train.durationMinutes ? ` · ${train.durationMinutes}m` : ''}
                 {train.isFast ? ' · Fast' : ''}
               </div>
-              <div className="train-arr">
-                arr {formatTime(train.estimatedArrival ?? train.scheduledArrival ?? '')}
-                {train.platform ? ` · Plat ${train.platform}` : ''}
-              </div>
+                <div className="train-arr">
+                  arr {(() => {
+                    if (train.estimatedArrival) return formatTime(train.estimatedArrival)
+                    if (train.estimatedDeparture && train.durationMinutes) {
+                      const [h, m] = train.estimatedDeparture.split(':').map(Number)
+                      const total = h * 60 + m + train.durationMinutes
+                      return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+                    }
+                    return '--:--'
+                  })()} {train.platform ? `· Plat ${train.platform}` : ''}
+                </div>
             </div>
             <div />
             <div style={{ textAlign: 'right' }}>
