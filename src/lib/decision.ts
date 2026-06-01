@@ -2,14 +2,12 @@ import type { TrainOption, DecisionLabel, Destination, Direction } from './stati
 
 const SWITCH_THRESHOLD_MINUTES = 8
 
-function depMinutes(train: TrainOption): number {
-  const [h, m] = train.estimatedDeparture.split(':').map(Number)
-  return h * 60 + m
-}
-
 function arrMinutes(train: TrainOption): number | null {
+  const [h, m] = train.estimatedDeparture.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return null
+  const dep = h * 60 + m
   if (!train.durationMinutes) return null
-  return depMinutes(train) + train.durationMinutes
+  return dep + train.durationMinutes
 }
 
 export function getRecommendation(
@@ -30,48 +28,47 @@ export function getRecommendation(
 
   if (direction === 'london') {
     const fast = usable.find(t => t.isFast && t.status !== 'cancelled')
-    const best = fast ?? usable[0]
-    return { label: 'Take this', bestTrain: best }
+    return { label: 'Take this', bestTrain: fast ?? usable[0] }
   }
 
-  // Homebound logic — compare direct Elizabeth from ZFD vs GWR from PAD
-  const directElizabeth = usable.find(
+  // Homebound — find best Elizabeth from ZFD and best GWR from PAD
+  const bestElizabeth = usable.find(
     t => t.operator === 'Elizabeth' && t.from === 'ZFD' && !t.terminatesPaddington
   )
-  const gwrFromPad = usable.find(
+  const bestGWR = usable.find(
     t => t.operator === 'GWR' && t.from === 'PAD'
   )
   const terminatingElizabeth = usable.find(
     t => t.operator === 'Elizabeth' && t.terminatesPaddington
   )
 
-  // No through Elizabeth line
-  if (!directElizabeth && terminatingElizabeth) {
-    if (gwrFromPad) return { label: 'Worth changing at Paddington', bestTrain: gwrFromPad }
+  // No through Elizabeth line at all
+  if (!bestElizabeth && terminatingElizabeth) {
+    if (bestGWR) return { label: 'Worth changing at Paddington', bestTrain: bestGWR }
     return { label: 'Check Paddington departures', bestTrain: terminatingElizabeth }
   }
 
-  // Compare direct Elizabeth vs GWR from Paddington
-  if (directElizabeth && gwrFromPad) {
-    const elizArr = arrMinutes(directElizabeth)
-    const gwrArr = arrMinutes(gwrFromPad)
+  // Compare next Elizabeth arrival vs next GWR arrival
+  if (bestElizabeth && bestGWR) {
+    const elizArr = arrMinutes(bestElizabeth)
+    const gwrArr = arrMinutes(bestGWR)
 
     if (elizArr !== null && gwrArr !== null) {
       const saving = elizArr - gwrArr
       if (saving >= SWITCH_THRESHOLD_MINUTES) {
-        return { label: 'Worth changing at Paddington', bestTrain: gwrFromPad }
+        return { label: 'Worth changing at Paddington', bestTrain: bestGWR }
       } else {
-        return { label: 'Stay on Elizabeth line', bestTrain: directElizabeth }
+        return { label: 'Stay on Elizabeth line', bestTrain: bestElizabeth }
       }
     }
   }
 
-  if (gwrFromPad && !directElizabeth) {
-    return { label: 'Worth changing at Paddington', bestTrain: gwrFromPad }
+  if (bestGWR && !bestElizabeth) {
+    return { label: 'Worth changing at Paddington', bestTrain: bestGWR }
   }
 
-  if (directElizabeth) {
-    return { label: 'Stay on Elizabeth line', bestTrain: directElizabeth }
+  if (bestElizabeth) {
+    return { label: 'Stay on Elizabeth line', bestTrain: bestElizabeth }
   }
 
   return { label: 'No useful fast option', bestTrain: usable[0] ?? null }
@@ -85,5 +82,5 @@ export function sortAndFilterTrains(trains: TrainOption[]): TrainOption[] {
       const [bh, bm] = b.estimatedDeparture.split(':').map(Number)
       return (ah * 60 + am) - (bh * 60 + bm)
     })
-    .slice(0, 5)
+    .slice(0, 6)
 }
