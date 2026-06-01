@@ -34,7 +34,7 @@ export function TrainList({ trains, bestId }: Props) {
       {trains.map(train => {
         const opClass = train.operator === 'GWR' ? 'op-gwr' : 'op-eliz'
         const isBest = train.id === bestId
-        const requiresChange = train.from === 'PAD'
+        const requiresChange = train.from === 'PAD' && train.operator === 'GWR'
         const statusCls =
           train.status === 'on_time' ? 'status-ontime' :
           train.status === 'delayed' ? 'status-delayed' : 'status-cancelled'
