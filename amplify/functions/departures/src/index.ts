@@ -47,6 +47,65 @@ function delayMins(scheduled: string | undefined, actual: string | undefined): n
   } catch { return 0 }
 }
 
+async function fetchServices(accessToken: string, from: string, to: string) {
+  const url = new URL(`${RTT_BASE}/gb-nr/location`)
+  url.searchParams.set('code', from)
+  url.searchParams.set('filterTo', to)
+  url.searchParams.set('timeWindow', '120')
+
+  const rttRes = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  })
+
+  if (!rttRes.ok) {
+    const text = await rttRes.text()
+    console.error('RTT error', rttRes.status, text)
+    throw new Error(`RTT API error: ${rttRes.status}`)
+  }
+
+  const rttData = await rttRes.json() as { services?: Record<string, unknown>[] }
+  const services = rttData.services ?? []
+
+  return services
+    .filter((s: any) => s.temporalData?.departure?.isCancelled !== true)
+    .slice(0, 8)
+    .map((s: any) => {
+      const dep = s.temporalData?.departure
+      const plat = s.locationMetadata?.platform
+      const sched = dep?.scheduleAdvertised
+      const actual = dep?.realtimeEstimate ?? dep?.realtimeForecast ?? dep?.realtimeActual
+      const schedDep = toHHMM(sched)
+      const estDep = toHHMM(actual) || schedDep
+      const delay = delayMins(sched, actual)
+      const destLocation = s.destination?.[0]?.location
+      const operator = s.scheduleMetadata?.operator?.code ?? 'Other'
+
+      const operatorName =
+        operator === 'GW' ? 'GWR' :
+        operator === 'XR' ? 'Elizabeth' :
+        operator === 'TL' ? 'Elizabeth' : 'Other'
+
+      const isCancelled = dep?.isCancelled === true
+      const status = isCancelled ? 'cancelled' : delay > 0 ? 'delayed' : 'on_time'
+
+      return {
+        id: s.scheduleMetadata?.uniqueIdentity ?? Math.random().toString(),
+        operator: operatorName,
+        from,
+        to,
+        scheduledDeparture: schedDep,
+        estimatedDeparture: estDep,
+        durationMinutes: typicalDuration(operatorName, from, to),
+        platform: plat?.actual ?? plat?.forecast ?? plat?.planned ?? undefined,
+        status,
+        delayMinutes: delay,
+        destinationName: destLocation?.description,
+        isFast: true,
+        terminatesPaddington: destLocation?.shortCodes?.includes('PAD') && to !== 'PAD',
+      }
+    })
+}
+
 export const handler = async (event: {
   httpMethod?: string
   queryStringParameters?: Record<string, string>
@@ -77,62 +136,29 @@ export const handler = async (event: {
   try {
     const accessToken = await getAccessToken(refreshToken)
 
-    const url = new URL(`${RTT_BASE}/gb-nr/location`)
-    url.searchParams.set('code', from)
-    url.searchParams.set('filterTo', to)
-    url.searchParams.set('timeWindow', '120')
+    let trains: Awaited<ReturnType<typeof fetchServices>>
 
-    const rttRes = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
-    })
-
-    if (!rttRes.ok) {
-      const text = await rttRes.text()
-      console.error('RTT error', rttRes.status, text)
-      return { statusCode: 502, headers, body: JSON.stringify({ error: `RTT API error: ${rttRes.status}` }) }
+    if (from === 'ZFD') {
+      const [zfdTrains, padTrains] = await Promise.all([
+        fetchServices(accessToken, 'ZFD', to),
+        fetchServices(accessToken, 'PAD', to),
+      ])
+      trains = [...zfdTrains, ...padTrains].sort((a, b) => {
+        const [ah, am] = a.estimatedDeparture.split(':').map(Number)
+        const [bh, bm] = b.estimatedDeparture.split(':').map(Number)
+        return (ah * 60 + am) - (bh * 60 + bm)
+      })
+    } else {
+      trains = await fetchServices(accessToken, from, to)
     }
 
-    const rttData = await rttRes.json() as { services?: Record<string, unknown>[] }
-    const services = rttData.services ?? []
-
-    const trains = services
-      .filter((s: any) => s.temporalData?.departure?.isCancelled !== true)
-      .slice(0, 8)
-      .map((s: any) => {
-        const dep = s.temporalData?.departure
-        const plat = s.locationMetadata?.platform
-        const sched = dep?.scheduleAdvertised
-        const actual = dep?.realtimeEstimate ?? dep?.realtimeForecast ?? dep?.realtimeActual
-        const schedDep = toHHMM(sched)
-        const estDep = toHHMM(actual) || schedDep
-        const delay = delayMins(sched, actual)
-        const destLocation = s.destination?.[0]?.location
-        const operator = s.scheduleMetadata?.operator?.code ?? 'Other'
-
-        const operatorName =
-          operator === 'GW' ? 'GWR' :
-          operator === 'XR' ? 'Elizabeth' :
-          operator === 'TL' ? 'Elizabeth' : 'Other'
-
-        const isCancelled = dep?.isCancelled === true
-        const status = isCancelled ? 'cancelled' : delay > 0 ? 'delayed' : 'on_time'
-
-        return {
-          id: s.scheduleMetadata?.uniqueIdentity ?? Math.random().toString(),
-          operator: operatorName,
-          from,
-          to,
-          scheduledDeparture: schedDep,
-          estimatedDeparture: estDep,
-          durationMinutes: typicalDuration(operatorName, from, to),
-          platform: plat?.actual ?? plat?.forecast ?? plat?.planned ?? undefined,
-          status,
-          delayMinutes: delay,
-          destinationName: destLocation?.description,
-          isFast: true,
-          terminatesPaddington: destLocation?.shortCodes?.includes('PAD') && to !== 'PAD',
-        }
-      })
-
     return {
-      statusCode: 20
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ trains }),
+    }
+  } catch (err) {
+    console.error('Handler error', err)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
+  }
+}
