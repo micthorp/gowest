@@ -47,11 +47,17 @@ function delayMins(scheduled: string | undefined, actual: string | undefined): n
   } catch { return 0 }
 }
 
+function nowLondonISO(): string {
+  return new Date().toLocaleString('sv-SE', { timeZone: 'Europe/London' }).replace(' ', 'T')
+}
+
 async function fetchServices(accessToken: string, from: string, to: string) {
+  const timeFrom = nowLondonISO()
   const url = new URL(`${RTT_BASE}/gb-nr/location`)
   url.searchParams.set('code', from)
   url.searchParams.set('filterTo', to)
   url.searchParams.set('timeWindow', '120')
+  url.searchParams.set('timeFrom', timeFrom)
 
   const rttRes = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
