@@ -44,7 +44,7 @@ export function TrainList({ trains, bestId }: Props) {
             <div className="train-depart">{formatTime(train.estimatedDeparture)}</div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>
-                <span className={`op-badge ${opClass}`} style={{ fontSize: '10px' }}>
+                <span className={`op-badge ${opClass}`}>
                   {operatorLabel(train.operator)}
                 </span>
                 {requiresChange && (

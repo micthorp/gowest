@@ -110,7 +110,7 @@ body {
   margin-bottom: 12px;
 }
 .rec-label {
-  font-size: 10px; font-weight: 600;
+  font-size: 12px; font-weight: 600;
   color: var(--gw-muted); letter-spacing: 2px;
   text-transform: uppercase; margin-bottom: 7px;
 }
@@ -129,7 +129,7 @@ body {
 
 /* ── Operator badges ── */
 .op-badge {
-  font-size: 10px; font-weight: 700;
+  font-size: 12px; font-weight: 700;
   padding: 2px 6px; border-radius: 2px; letter-spacing: 1px;
 }
 .op-gwr  { background: #7c3000; color: #f97316; border: 1px solid #f97316; }
@@ -137,7 +137,7 @@ body {
 
 /* ── Pills ── */
 .pill {
-  font-size: 10px; font-weight: 700;
+  font-size: 12px; font-weight: 700;
   padding: 3px 8px; border-radius: 2px;
   letter-spacing: 0.8px; text-transform: uppercase;
 }
@@ -149,7 +149,7 @@ body {
 
 /* ── Train list ── */
 .section-label {
-  font-size: 10px; font-weight: 600;
+  font-size: 12px; font-weight: 600;
   color: var(--gw-muted); letter-spacing: 2px;
   text-transform: uppercase; margin-bottom: 7px;
 }
@@ -168,11 +168,11 @@ body {
 }
 .train-row:last-child { border-bottom: none; }
 .train-row.best { border-left: 3px solid var(--gw-gold); padding-left: 8px; }
-.train-depart { font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500; color: var(--gw-text); }
-.train-route  { font-size: 11px; color: var(--gw-muted); margin-top: 2px; }
-.train-arr    { font-size: 10px; color: var(--gw-muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+.train-depart { font-family: 'DM Mono', monospace; font-size: 17px; font-weight: 500; color: var(--gw-text); }
+.train-route  { font-size: 13px; color: var(--gw-muted); margin-top: 2px; }
+.train-arr    { font-size: 12px; color: var(--gw-muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
 .train-status {
-  font-size: 10px; font-weight: 700;
+  font-size: 12px; font-weight: 700;
   padding: 2px 7px; border-radius: 2px;
   text-align: right; white-space: nowrap;
   letter-spacing: 0.5px; text-transform: uppercase;
