@@ -1,20 +1,57 @@
 import type { TrainOption, DecisionLabel, Destination, Direction } from './stations'
+import { addMinutesToHHMM, boardMinutes, compareBoardTimes } from './time'
 
-const SWITCH_THRESHOLD_MINUTES = 8
+/** Only switch to GWR if it gets you there at least this many minutes earlier. */
+export const SWITCH_THRESHOLD_MINUTES = 8
 
-function arrMinutes(train: TrainOption): number | null {
-  const [h, m] = train.estimatedDeparture.split(':').map(Number)
-  if (isNaN(h) || isNaN(m)) return null
-  const dep = h * 60 + m
+/** Typical Elizabeth line Farringdon → Paddington running time. */
+export const ZFD_TO_PAD_MINUTES = 12
+
+/** Walking / platform-change allowance at Paddington. */
+export const PAD_INTERCHANGE_MINUTES = 8
+
+export interface Recommendation {
+  label: DecisionLabel
+  bestTrain: TrainOption | null
+  detail?: string
+}
+
+function byDeparture(a: TrainOption, b: TrainOption): number {
+  return compareBoardTimes(a.estimatedDeparture, b.estimatedDeparture)
+}
+
+function arrivalMinutes(train: TrainOption): number | null {
+  if (train.estimatedArrival) {
+    const mins = boardMinutes(train.estimatedArrival)
+    return Number.isFinite(mins) ? mins : null
+  }
   if (!train.durationMinutes) return null
+  const dep = boardMinutes(train.estimatedDeparture)
+  if (!Number.isFinite(dep)) return null
   return dep + train.durationMinutes
 }
+
+function padArrivalFromElizabeth(train: TrainOption): number | null {
+  const dep = boardMinutes(train.estimatedDeparture)
+  if (!Number.isFinite(dep)) return null
+  return dep + ZFD_TO_PAD_MINUTES
+}
+
+function earliest(trains: TrainOption[]): TrainOption | undefined {
+  return [...trains].sort(byDeparture)[0]
+}
+
+const LAST_RESORT_LABELS: DecisionLabel[] = [
+  'Disrupted',
+  'First moving train wins',
+  'No useful fast option',
+]
 
 export function getRecommendation(
   trains: TrainOption[],
   direction: Direction,
-  _destination: Destination
-): { label: DecisionLabel; bestTrain: TrainOption | null } {
+  destination: Destination
+): Recommendation {
   const usable = trains.filter(t => t.status !== 'cancelled')
 
   if (usable.length === 0) {
@@ -23,64 +60,131 @@ export function getRecommendation(
 
   const allDisrupted = usable.every(t => t.status === 'delayed' && (t.delayMinutes ?? 0) > 20)
   if (allDisrupted) {
-    return { label: 'Disrupted', bestTrain: usable[0] }
+    return { label: 'Disrupted', bestTrain: earliest(usable) ?? null }
   }
 
-  if (direction === 'london') {
-    const fast = usable.find(t => t.isFast && t.status !== 'cancelled')
-    return { label: 'Take this', bestTrain: fast ?? usable[0] }
-  }
-
-  // Homebound — find best Elizabeth from ZFD and best GWR from PAD
-  const bestElizabeth = usable.find(
-    t => t.operator === 'Elizabeth' && t.from === 'ZFD' && !t.terminatesPaddington
-  )
-  const bestGWR = usable.find(
-    t => t.operator === 'GWR' && t.from === 'PAD'
-  )
-  const terminatingElizabeth = usable.find(
-    t => t.operator === 'Elizabeth' && t.terminatesPaddington
-  )
-
-  // No through Elizabeth line at all
-  if (!bestElizabeth && terminatingElizabeth) {
-    if (bestGWR) return { label: 'Worth changing at Paddington', bestTrain: bestGWR }
-    return { label: 'Check Paddington departures', bestTrain: terminatingElizabeth }
-  }
-
-  // Compare next Elizabeth arrival vs next GWR arrival
-  if (bestElizabeth && bestGWR) {
-    const elizArr = arrMinutes(bestElizabeth)
-    const gwrArr = arrMinutes(bestGWR)
-
-    if (elizArr !== null && gwrArr !== null) {
-      const saving = elizArr - gwrArr
-      if (saving >= SWITCH_THRESHOLD_MINUTES) {
-        return { label: 'Worth changing at Paddington', bestTrain: bestGWR }
-      } else {
-        return { label: 'Stay on Elizabeth line', bestTrain: bestElizabeth }
-      }
+  if (destination === 'BCF') {
+    const chiltern = earliest(usable.filter(t => t.operator === 'Chiltern'))
+    return {
+      label: 'Take this',
+      bestTrain: chiltern ?? earliest(usable) ?? null,
+      detail: direction === 'homebound'
+        ? 'Chiltern from Marylebone to Beaconsfield'
+        : 'Chiltern from Beaconsfield to Marylebone',
     }
   }
 
-  if (bestGWR && !bestElizabeth) {
-    return { label: 'Worth changing at Paddington', bestTrain: bestGWR }
+  if (direction === 'london') {
+    const fast = earliest(usable.filter(t => t.operator === 'GWR'))
+    return { label: 'Take this', bestTrain: fast ?? earliest(usable) ?? null }
   }
 
-  if (bestElizabeth) {
-    return { label: 'Stay on Elizabeth line', bestTrain: bestElizabeth }
+  const elizabethFromZfd = usable.filter(t => t.operator === 'Elizabeth' && t.from === 'ZFD')
+  const throughElizabeth = earliest(elizabethFromZfd.filter(t => !t.terminatesPaddington))
+  const terminatingElizabeth = earliest(elizabethFromZfd.filter(t => t.terminatesPaddington))
+  const feeder = throughElizabeth ?? terminatingElizabeth
+
+  const gwrFromPad = usable.filter(t => t.operator === 'GWR' && t.from === 'PAD').sort(byDeparture)
+
+  const feederArrivesPad = feeder ? padArrivalFromElizabeth(feeder) : null
+  const catchableGwr = gwrFromPad.find(gwr => {
+    if (feederArrivesPad === null) return false
+    const gwrDep = boardMinutes(gwr.estimatedDeparture)
+    if (!Number.isFinite(gwrDep)) return false
+    return gwrDep >= feederArrivesPad + PAD_INTERCHANGE_MINUTES
+  })
+
+  const changeDetail = (gwr: TrainOption) => {
+    if (!feeder) return undefined
+    return `Take the ${feeder.estimatedDeparture} Elizabeth to Paddington, then ${gwr.estimatedDeparture} GWR`
   }
 
-  return { label: 'No useful fast option', bestTrain: usable[0] ?? null }
+  if (!throughElizabeth && terminatingElizabeth) {
+    if (catchableGwr) {
+      return {
+        label: 'Worth changing at Paddington',
+        bestTrain: catchableGwr,
+        detail: changeDetail(catchableGwr),
+      }
+    }
+    return { label: 'Check Paddington departures', bestTrain: terminatingElizabeth }
+  }
+
+  if (throughElizabeth && catchableGwr) {
+    const elizArr = arrivalMinutes(throughElizabeth)
+    const gwrArr = arrivalMinutes(catchableGwr)
+    if (elizArr !== null && gwrArr !== null) {
+      const saving = elizArr - gwrArr
+      if (saving >= SWITCH_THRESHOLD_MINUTES) {
+        return {
+          label: 'Worth changing at Paddington',
+          bestTrain: catchableGwr,
+          detail: changeDetail(catchableGwr),
+        }
+      }
+      return { label: 'Stay on Elizabeth line', bestTrain: throughElizabeth }
+    }
+  }
+
+  if (catchableGwr && !throughElizabeth) {
+    return {
+      label: 'Worth changing at Paddington',
+      bestTrain: catchableGwr,
+      detail: changeDetail(catchableGwr),
+    }
+  }
+
+  if (throughElizabeth) {
+    return { label: 'Stay on Elizabeth line', bestTrain: throughElizabeth }
+  }
+
+  if (gwrFromPad[0]) {
+    return {
+      label: 'Check Paddington departures',
+      bestTrain: gwrFromPad[0],
+      detail: 'No Elizabeth feeder from Farringdon in this window — GWR may not be catchable.',
+    }
+  }
+
+  return { label: 'No useful fast option', bestTrain: earliest(usable) ?? null }
+}
+
+/** Promote Chiltern when the Paddington / Elizabeth corridor has nothing useful. */
+export function withChilternBackup(
+  westRec: Recommendation,
+  westTrains: TrainOption[],
+  chilternTrains: TrainOption[],
+  direction: Direction
+): Recommendation {
+  const usableWest = westTrains.filter(t => t.status !== 'cancelled')
+  const westFailed = LAST_RESORT_LABELS.includes(westRec.label) || usableWest.length === 0
+  if (!westFailed) return westRec
+
+  const nextChiltern = earliest(chilternTrains.filter(t => t.status !== 'cancelled' && t.operator === 'Chiltern'))
+    ?? earliest(chilternTrains.filter(t => t.status !== 'cancelled'))
+  if (!nextChiltern) return westRec
+
+  return {
+    label: 'Use Chiltern via Marylebone',
+    bestTrain: nextChiltern,
+    detail: direction === 'homebound'
+      ? 'Paddington corridor looks poor. Next Chiltern from Marylebone to Beaconsfield.'
+      : 'Paddington corridor looks poor. Next Chiltern from Beaconsfield to Marylebone.',
+  }
 }
 
 export function sortAndFilterTrains(trains: TrainOption[]): TrainOption[] {
-  return trains
-    .filter(t => t.status !== 'cancelled' || trains.filter(u => u.status !== 'cancelled').length === 0)
-    .sort((a, b) => {
-      const [ah, am] = a.estimatedDeparture.split(':').map(Number)
-      const [bh, bm] = b.estimatedDeparture.split(':').map(Number)
-      return (ah * 60 + am) - (bh * 60 + bm)
-    })
-    .slice(0, 6)
+  const active = trains.filter(t => t.status !== 'cancelled')
+  const source = active.length > 0 ? active : trains
+  return [...source].sort(byDeparture).slice(0, 6)
+}
+
+export function estimatedArrivalHHMM(train: TrainOption): string | null {
+  if (train.estimatedArrival && /^\d{2}:\d{2}$/.test(train.estimatedArrival)) {
+    return train.estimatedArrival
+  }
+  if (train.durationMinutes && train.estimatedDeparture) {
+    return addMinutesToHHMM(train.estimatedDeparture, train.durationMinutes)
+  }
+  return null
 }
