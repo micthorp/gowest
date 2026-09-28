@@ -49,9 +49,9 @@ The RTT token is **never** exposed to the browser. It lives only in the Lambda f
 |---|---|---|
 | Homebound | ZFD (Farringdon) | MAI (Maidenhead) or RDG (Reading) |
 | Homebound | PAD (Paddington) | MAI or RDG |
-| Homebound | MYB (Marylebone) | BEF (Beaconsfield) — Chiltern backup |
+| Homebound | MYB (Marylebone) | BCF (Beaconsfield) — Chiltern backup |
 | London-bound | MAI or RDG | PAD (Paddington) |
-| London-bound | BEF (Beaconsfield) | MYB (Marylebone) — Chiltern backup |
+| London-bound | BCF (Beaconsfield) | MYB (Marylebone) — Chiltern backup |
 
 ## Decision logic
 

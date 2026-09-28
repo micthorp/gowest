@@ -63,7 +63,7 @@ export function getRecommendation(
     return { label: 'Disrupted', bestTrain: earliest(usable) ?? null }
   }
 
-  if (destination === 'BEF') {
+  if (destination === 'BCF') {
     const chiltern = earliest(usable.filter(t => t.operator === 'Chiltern'))
     return {
       label: 'Take this',

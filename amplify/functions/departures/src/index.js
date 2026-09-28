@@ -1,4 +1,4 @@
-const ALLOWED_STATIONS = new Set(['ZFD', 'PAD', 'MAI', 'RDG', 'MYB', 'BEF'])
+const ALLOWED_STATIONS = new Set(['ZFD', 'PAD', 'MAI', 'RDG', 'MYB', 'BCF'])
 const RTT_BASE = 'https://data.rtt.io'
 
 let cachedAccessToken = null
@@ -21,7 +21,7 @@ async function getAccessToken(refreshToken) {
 }
 
 function typicalDuration(operator, from, to) {
-  if ((from === 'MYB' && to === 'BEF') || (from === 'BEF' && to === 'MYB')) return 27
+  if ((from === 'MYB' && to === 'BCF') || (from === 'BCF' && to === 'MYB')) return 27
   if (from === 'PAD' || from === 'ZFD') {
     if (to === 'MAI') return operator === 'GWR' ? 23 : 47
     if (to === 'RDG') return operator === 'GWR' ? 32 : 65

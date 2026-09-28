@@ -47,9 +47,9 @@ export function Controls({ direction, destination, onDirectionChange, onDestinat
         </button>
         <button
           type="button"
-          className={`toggle-btn ${destination === 'BEF' ? 'active' : ''}`}
-          aria-pressed={destination === 'BEF'}
-          onClick={() => onDestinationChange('BEF')}
+          className={`toggle-btn ${destination === 'BCF' ? 'active' : ''}`}
+          aria-pressed={destination === 'BCF'}
+          onClick={() => onDestinationChange('BCF')}
         >
           Beaconsfield
         </button>

@@ -4,12 +4,12 @@ export const STATIONS = {
   MAI: { code: 'MAI', name: 'Maidenhead' },
   RDG: { code: 'RDG', name: 'Reading' },
   MYB: { code: 'MYB', name: 'London Marylebone' },
-  BEF: { code: 'BEF', name: 'Beaconsfield' },
+  BCF: { code: 'BCF', name: 'Beaconsfield' },
 } as const
 
 export type StationCode = keyof typeof STATIONS
 export type Direction = 'homebound' | 'london'
-export type Destination = 'MAI' | 'RDG' | 'BEF'
+export type Destination = 'MAI' | 'RDG' | 'BCF'
 
 export type TrainStatus = 'on_time' | 'delayed' | 'cancelled' | 'unknown'
 export type OperatorCode = 'GWR' | 'Elizabeth' | 'Chiltern' | 'Other'
@@ -51,17 +51,17 @@ export interface DeparturesResponse {
 }
 
 export function isChilternDestination(destination: Destination): boolean {
-  return destination === 'BEF'
+  return destination === 'BCF'
 }
 
 export function routeFor(
   direction: Direction,
   destination: Destination
 ): { from: StationCode; to: StationCode } {
-  if (destination === 'BEF') {
+  if (destination === 'BCF') {
     return direction === 'homebound'
-      ? { from: 'MYB', to: 'BEF' }
-      : { from: 'BEF', to: 'MYB' }
+      ? { from: 'MYB', to: 'BCF' }
+      : { from: 'BCF', to: 'MYB' }
   }
   if (direction === 'homebound') return { from: 'ZFD', to: destination }
   return { from: destination, to: 'PAD' }
@@ -69,6 +69,6 @@ export function routeFor(
 
 export function chilternBackupRoute(direction: Direction): { from: StationCode; to: StationCode } {
   return direction === 'homebound'
-    ? { from: 'MYB', to: 'BEF' }
-    : { from: 'BEF', to: 'MYB' }
+    ? { from: 'MYB', to: 'BCF' }
+    : { from: 'BCF', to: 'MYB' }
 }

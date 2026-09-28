@@ -21,7 +21,7 @@ const REFRESH_INTERVAL = 30_000
 const PREFS_KEY = 'gowest-prefs'
 
 function parseDestination(value?: string): Destination {
-  if (value === 'RDG' || value === 'BEF') return value
+  if (value === 'RDG' || value === 'BCF' || value === 'BEF') return value === 'BEF' ? 'BCF' : value
   return 'MAI'
 }
 

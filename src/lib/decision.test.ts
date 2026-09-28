@@ -77,11 +77,11 @@ describe('getRecommendation chiltern', () => {
   it('takes the next Chiltern from Marylebone when Beaconsfield is selected', () => {
     const rec = getRecommendation(
       [
-        train({ id: 'c-later', operator: 'Chiltern', from: 'MYB', to: 'BEF', estimatedDeparture: '18:10', durationMinutes: 31 }),
-        train({ id: 'c-soon', operator: 'Chiltern', from: 'MYB', to: 'BEF', estimatedDeparture: '17:50', durationMinutes: 27 }),
+        train({ id: 'c-later', operator: 'Chiltern', from: 'MYB', to: 'BCF', estimatedDeparture: '18:10', durationMinutes: 31 }),
+        train({ id: 'c-soon', operator: 'Chiltern', from: 'MYB', to: 'BCF', estimatedDeparture: '17:50', durationMinutes: 27 }),
       ],
       'homebound',
-      'BEF'
+      'BCF'
     )
     expect(rec.label).toBe('Take this')
     expect(rec.bestTrain?.id).toBe('c-soon')
@@ -95,7 +95,7 @@ describe('withChilternBackup', () => {
       train({ id: 'e1', operator: 'Elizabeth', from: 'ZFD', estimatedDeparture: '17:44', durationMinutes: 53 }),
     ]
     const chiltern = [
-      train({ id: 'c1', operator: 'Chiltern', from: 'MYB', to: 'BEF', estimatedDeparture: '17:50', durationMinutes: 27 }),
+      train({ id: 'c1', operator: 'Chiltern', from: 'MYB', to: 'BCF', estimatedDeparture: '17:50', durationMinutes: 27 }),
     ]
     const westRec = getRecommendation(west, 'homebound', 'MAI')
     const rec = withChilternBackup(westRec, west, chiltern, 'homebound')
@@ -109,7 +109,7 @@ describe('withChilternBackup', () => {
       train({ id: 'g1', operator: 'GWR', from: 'PAD', estimatedDeparture: '17:42', status: 'cancelled' }),
     ]
     const chiltern = [
-      train({ id: 'c1', operator: 'Chiltern', from: 'MYB', to: 'BEF', estimatedDeparture: '17:50', durationMinutes: 27 }),
+      train({ id: 'c1', operator: 'Chiltern', from: 'MYB', to: 'BCF', estimatedDeparture: '17:50', durationMinutes: 27 }),
     ]
     const westRec = getRecommendation(west, 'homebound', 'MAI')
     const rec = withChilternBackup(westRec, west, chiltern, 'homebound')

@@ -20,15 +20,15 @@ export const MOCK_TRAINS: Record<string, TrainOption[]> = {
     { id: 'l3', operator: 'GWR', from: 'MAI', to: 'PAD', scheduledDeparture: '17:52', estimatedDeparture: '17:52', scheduledArrival: '18:16', estimatedArrival: '18:16', durationMinutes: 24, platform: '2', status: 'on_time', isFast: true },
     { id: 'l4', operator: 'Elizabeth', from: 'MAI', to: 'PAD', scheduledDeparture: '18:00', estimatedDeparture: '18:03', scheduledArrival: '18:28', estimatedArrival: '18:31', durationMinutes: 28, platform: '4', status: 'delayed', delayMinutes: 3, isFast: false },
   ],
-  'MYB-BEF': [
-    { id: 'c1', operator: 'Chiltern', from: 'MYB', to: 'BEF', scheduledDeparture: '17:50', estimatedDeparture: '17:50', scheduledArrival: '18:17', estimatedArrival: '18:17', durationMinutes: 27, platform: '3', status: 'on_time', isFast: true },
-    { id: 'c2', operator: 'Chiltern', from: 'MYB', to: 'BEF', scheduledDeparture: '18:10', estimatedDeparture: '18:10', scheduledArrival: '18:41', estimatedArrival: '18:41', durationMinutes: 31, platform: '4', status: 'on_time', isFast: false },
-    { id: 'c3', operator: 'Chiltern', from: 'MYB', to: 'BEF', scheduledDeparture: '18:22', estimatedDeparture: '18:27', scheduledArrival: '18:49', estimatedArrival: '18:54', durationMinutes: 27, platform: '2', status: 'delayed', delayMinutes: 5, isFast: true },
+  'MYB-BCF': [
+    { id: 'c1', operator: 'Chiltern', from: 'MYB', to: 'BCF', scheduledDeparture: '17:50', estimatedDeparture: '17:50', scheduledArrival: '18:17', estimatedArrival: '18:17', durationMinutes: 27, platform: '3', status: 'on_time', isFast: true },
+    { id: 'c2', operator: 'Chiltern', from: 'MYB', to: 'BCF', scheduledDeparture: '18:10', estimatedDeparture: '18:10', scheduledArrival: '18:41', estimatedArrival: '18:41', durationMinutes: 31, platform: '4', status: 'on_time', isFast: false },
+    { id: 'c3', operator: 'Chiltern', from: 'MYB', to: 'BCF', scheduledDeparture: '18:22', estimatedDeparture: '18:27', scheduledArrival: '18:49', estimatedArrival: '18:54', durationMinutes: 27, platform: '2', status: 'delayed', delayMinutes: 5, isFast: true },
   ],
-  'BEF-MYB': [
-    { id: 'cb1', operator: 'Chiltern', from: 'BEF', to: 'MYB', scheduledDeparture: '17:36', estimatedDeparture: '17:36', scheduledArrival: '18:03', estimatedArrival: '18:03', durationMinutes: 27, platform: '1', status: 'on_time', isFast: true },
-    { id: 'cb2', operator: 'Chiltern', from: 'BEF', to: 'MYB', scheduledDeparture: '18:06', estimatedDeparture: '18:06', scheduledArrival: '18:37', estimatedArrival: '18:37', durationMinutes: 31, platform: '2', status: 'on_time', isFast: false },
-    { id: 'cb3', operator: 'Chiltern', from: 'BEF', to: 'MYB', scheduledDeparture: '18:36', estimatedDeparture: '18:36', scheduledArrival: '19:03', estimatedArrival: '19:03', durationMinutes: 27, platform: '1', status: 'on_time', isFast: true },
+  'BCF-MYB': [
+    { id: 'cb1', operator: 'Chiltern', from: 'BCF', to: 'MYB', scheduledDeparture: '17:36', estimatedDeparture: '17:36', scheduledArrival: '18:03', estimatedArrival: '18:03', durationMinutes: 27, platform: '1', status: 'on_time', isFast: true },
+    { id: 'cb2', operator: 'Chiltern', from: 'BCF', to: 'MYB', scheduledDeparture: '18:06', estimatedDeparture: '18:06', scheduledArrival: '18:37', estimatedArrival: '18:37', durationMinutes: 31, platform: '2', status: 'on_time', isFast: false },
+    { id: 'cb3', operator: 'Chiltern', from: 'BCF', to: 'MYB', scheduledDeparture: '18:36', estimatedDeparture: '18:36', scheduledArrival: '19:03', estimatedArrival: '19:03', durationMinutes: 27, platform: '1', status: 'on_time', isFast: true },
   ],
   'RDG-PAD': [
     { id: 'rl1', operator: 'GWR', from: 'RDG', to: 'PAD', scheduledDeparture: '17:35', estimatedDeparture: '17:35', scheduledArrival: '17:58', estimatedArrival: '17:58', durationMinutes: 23, platform: '5', status: 'on_time', isFast: true },
