@@ -41,10 +41,16 @@ function earliest(trains: TrainOption[]): TrainOption | undefined {
   return [...trains].sort(byDeparture)[0]
 }
 
+const LAST_RESORT_LABELS: DecisionLabel[] = [
+  'Disrupted',
+  'First moving train wins',
+  'No useful fast option',
+]
+
 export function getRecommendation(
   trains: TrainOption[],
   direction: Direction,
-  _destination: Destination
+  destination: Destination
 ): Recommendation {
   const usable = trains.filter(t => t.status !== 'cancelled')
 
@@ -55,6 +61,17 @@ export function getRecommendation(
   const allDisrupted = usable.every(t => t.status === 'delayed' && (t.delayMinutes ?? 0) > 20)
   if (allDisrupted) {
     return { label: 'Disrupted', bestTrain: earliest(usable) ?? null }
+  }
+
+  if (destination === 'BEF') {
+    const chiltern = earliest(usable.filter(t => t.operator === 'Chiltern'))
+    return {
+      label: 'Take this',
+      bestTrain: chiltern ?? earliest(usable) ?? null,
+      detail: direction === 'homebound'
+        ? 'Chiltern from Marylebone to Beaconsfield'
+        : 'Chiltern from Beaconsfield to Marylebone',
+    }
   }
 
   if (direction === 'london') {
@@ -130,6 +147,30 @@ export function getRecommendation(
   }
 
   return { label: 'No useful fast option', bestTrain: earliest(usable) ?? null }
+}
+
+/** Promote Chiltern when the Paddington / Elizabeth corridor has nothing useful. */
+export function withChilternBackup(
+  westRec: Recommendation,
+  westTrains: TrainOption[],
+  chilternTrains: TrainOption[],
+  direction: Direction
+): Recommendation {
+  const usableWest = westTrains.filter(t => t.status !== 'cancelled')
+  const westFailed = LAST_RESORT_LABELS.includes(westRec.label) || usableWest.length === 0
+  if (!westFailed) return westRec
+
+  const nextChiltern = earliest(chilternTrains.filter(t => t.status !== 'cancelled' && t.operator === 'Chiltern'))
+    ?? earliest(chilternTrains.filter(t => t.status !== 'cancelled'))
+  if (!nextChiltern) return westRec
+
+  return {
+    label: 'Use Chiltern via Marylebone',
+    bestTrain: nextChiltern,
+    detail: direction === 'homebound'
+      ? 'Paddington corridor looks poor. Next Chiltern from Marylebone to Beaconsfield.'
+      : 'Paddington corridor looks poor. Next Chiltern from Beaconsfield to Marylebone.',
+  }
 }
 
 export function sortAndFilterTrains(trains: TrainOption[]): TrainOption[] {

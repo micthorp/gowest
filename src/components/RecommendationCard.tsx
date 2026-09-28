@@ -1,6 +1,6 @@
 import type { TrainOption } from '../lib/stations'
 import type { DecisionLabel } from '../lib/stations'
-import { formatTime, formatDuration, operatorLabel, statusLabel } from '../lib/format'
+import { formatTime, formatDuration, operatorLabel, operatorClass, statusLabel } from '../lib/format'
 import { estimatedArrivalHHMM } from '../lib/decision'
 import { STATIONS } from '../lib/stations'
 
@@ -11,7 +11,7 @@ interface Props {
 }
 
 function decisionClass(label: DecisionLabel): string {
-  if (label === 'Worth changing at Paddington' || label === 'Check Paddington departures') return 'rec-decision warn'
+  if (label === 'Worth changing at Paddington' || label === 'Check Paddington departures' || label === 'Use Chiltern via Marylebone') return 'rec-decision warn'
   if (label === 'Disrupted' || label === 'No useful fast option' || label === 'First moving train wins') return 'rec-decision bad'
   return 'rec-decision'
 }
@@ -27,7 +27,7 @@ export function RecommendationCard({ label, train, detail }: Props) {
     )
   }
 
-  const opClass = train.operator === 'GWR' ? 'op-gwr' : 'op-eliz'
+  const opClass = operatorClass(train.operator)
   const destName = STATIONS[train.to]?.name ?? train.to
   const estimatedArrival = estimatedArrivalHHMM(train)
 

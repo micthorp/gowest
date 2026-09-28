@@ -1,4 +1,4 @@
-const ALLOWED_STATIONS = new Set(['ZFD', 'PAD', 'MAI', 'RDG'])
+const ALLOWED_STATIONS = new Set(['ZFD', 'PAD', 'MAI', 'RDG', 'MYB', 'BEF'])
 const RTT_BASE = 'https://data.rtt.io'
 
 let cachedAccessToken: string | null = null
@@ -20,6 +20,7 @@ async function getAccessToken(refreshToken: string): Promise<string> {
 }
 
 function typicalDuration(operator: string, from: string, to: string): number | undefined {
+  if ((from === 'MYB' && to === 'BEF') || (from === 'BEF' && to === 'MYB')) return 27
   if (from === 'PAD' || from === 'ZFD') {
     if (to === 'MAI') return operator === 'GWR' ? 23 : 47
     if (to === 'RDG') return operator === 'GWR' ? 32 : 65
@@ -87,7 +88,8 @@ async function fetchServices(accessToken: string, from: string, to: string) {
 
       const operatorName =
         operator === 'GW' ? 'GWR' :
-        operator === 'XR' ? 'Elizabeth' : 'Other'
+        operator === 'XR' ? 'Elizabeth' :
+        operator === 'CH' ? 'Chiltern' : 'Other'
 
       const isCancelled = dep?.isCancelled === true
       const status = isCancelled ? 'cancelled' : delay > 0 ? 'delayed' : 'on_time'
@@ -104,7 +106,7 @@ async function fetchServices(accessToken: string, from: string, to: string) {
         status,
         delayMinutes: delay,
         destinationName: destLocation?.description,
-        isFast: operatorName === 'GWR',
+        isFast: operatorName === 'GWR' || operatorName === 'Chiltern',
         terminatesPaddington: Array.isArray(destLocation?.shortCodes)
           ? destLocation.shortCodes.includes('PAD') && to !== 'PAD'
           : destLocation?.crs === 'PAD' && to !== 'PAD',

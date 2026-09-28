@@ -1,5 +1,5 @@
 import type { TrainOption } from '../lib/stations'
-import { formatTime, operatorLabel, statusLabel } from '../lib/format'
+import { formatTime, operatorLabel, operatorClass, statusLabel } from '../lib/format'
 import { estimatedArrivalHHMM } from '../lib/decision'
 
 interface Props {
@@ -21,7 +21,7 @@ export function TrainList({ trains, bestId }: Props) {
   return (
     <div className="train-list">
       {trains.map(train => {
-        const opClass = train.operator === 'GWR' ? 'op-gwr' : 'op-eliz'
+        const opClass = operatorClass(train.operator)
         const isBest = train.id === bestId
         const requiresChange = train.from === 'PAD' && train.operator === 'GWR'
         const statusCls =

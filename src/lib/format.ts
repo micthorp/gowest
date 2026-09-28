@@ -17,7 +17,14 @@ export function formatDuration(mins?: number): string {
 
 export function operatorLabel(op: OperatorCode): string {
   if (op === 'Elizabeth') return 'ELZ'
+  if (op === 'Chiltern') return 'CHL'
   return op
+}
+
+export function operatorClass(op: OperatorCode): string {
+  if (op === 'GWR') return 'op-gwr'
+  if (op === 'Chiltern') return 'op-chil'
+  return 'op-eliz'
 }
 
 export function statusLabel(train: TrainOption): string {

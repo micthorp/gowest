@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRecommendation, sortAndFilterTrains } from './decision'
+import { getRecommendation, sortAndFilterTrains, withChilternBackup } from './decision'
 import type { TrainOption } from './stations'
 
 function train(partial: Partial<TrainOption> & Pick<TrainOption, 'id' | 'operator' | 'from' | 'estimatedDeparture'>): TrainOption {
@@ -70,6 +70,51 @@ describe('getRecommendation homebound', () => {
     const rec = getRecommendation(trains, 'homebound', 'MAI')
     expect(rec.label).toBe('Check Paddington departures')
     expect(rec.bestTrain?.id).toBe('e1')
+  })
+})
+
+describe('getRecommendation chiltern', () => {
+  it('takes the next Chiltern from Marylebone when Beaconsfield is selected', () => {
+    const rec = getRecommendation(
+      [
+        train({ id: 'c-later', operator: 'Chiltern', from: 'MYB', to: 'BEF', estimatedDeparture: '18:10', durationMinutes: 31 }),
+        train({ id: 'c-soon', operator: 'Chiltern', from: 'MYB', to: 'BEF', estimatedDeparture: '17:50', durationMinutes: 27 }),
+      ],
+      'homebound',
+      'BEF'
+    )
+    expect(rec.label).toBe('Take this')
+    expect(rec.bestTrain?.id).toBe('c-soon')
+    expect(rec.detail).toContain('Marylebone')
+  })
+})
+
+describe('withChilternBackup', () => {
+  it('does not override a healthy Paddington corridor', () => {
+    const west = [
+      train({ id: 'e1', operator: 'Elizabeth', from: 'ZFD', estimatedDeparture: '17:44', durationMinutes: 53 }),
+    ]
+    const chiltern = [
+      train({ id: 'c1', operator: 'Chiltern', from: 'MYB', to: 'BEF', estimatedDeparture: '17:50', durationMinutes: 27 }),
+    ]
+    const westRec = getRecommendation(west, 'homebound', 'MAI')
+    const rec = withChilternBackup(westRec, west, chiltern, 'homebound')
+    expect(rec.label).toBe('Stay on Elizabeth line')
+    expect(rec.bestTrain?.id).toBe('e1')
+  })
+
+  it('promotes Chiltern when westbound services are all cancelled', () => {
+    const west = [
+      train({ id: 'e1', operator: 'Elizabeth', from: 'ZFD', estimatedDeparture: '17:44', status: 'cancelled' }),
+      train({ id: 'g1', operator: 'GWR', from: 'PAD', estimatedDeparture: '17:42', status: 'cancelled' }),
+    ]
+    const chiltern = [
+      train({ id: 'c1', operator: 'Chiltern', from: 'MYB', to: 'BEF', estimatedDeparture: '17:50', durationMinutes: 27 }),
+    ]
+    const westRec = getRecommendation(west, 'homebound', 'MAI')
+    const rec = withChilternBackup(westRec, west, chiltern, 'homebound')
+    expect(rec.label).toBe('Use Chiltern via Marylebone')
+    expect(rec.bestTrain?.id).toBe('c1')
   })
 })
 

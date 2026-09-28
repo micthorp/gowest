@@ -76,6 +76,7 @@ body {
   border-bottom: 2px solid var(--gw-gold);
   padding: 10px 12px;
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 .toggle-group {
@@ -86,13 +87,13 @@ body {
   overflow: hidden;
 }
 .toggle-btn {
-  flex: 1; padding: 7px 6px;
+  flex: 1; padding: 7px 4px;
   font-family: 'Oswald', sans-serif;
-  font-size: 13px; font-weight: 600;
+  font-size: 12px; font-weight: 600;
   background: none; border: none;
   color: var(--gw-muted); cursor: pointer;
   transition: all 0.15s;
-  letter-spacing: 0.8px; text-transform: uppercase;
+  letter-spacing: 0.4px; text-transform: uppercase;
 }
 .toggle-btn.active { background: var(--gw-red); color: #fff; }
 
@@ -153,6 +154,7 @@ body {
 }
 .op-gwr  { background: #7c3000; color: #f97316; border: 1px solid #f97316; }
 .op-eliz { background: #1a0a40; color: #a78bfa; border: 1px solid #7c3aed; }
+.op-chil { background: #042f2e; color: #2dd4bf; border: 1px solid #14b8a6; }
 
 /* ── Pills ── */
 .pill {
@@ -172,6 +174,7 @@ body {
   color: var(--gw-muted); letter-spacing: 2px;
   text-transform: uppercase; margin-bottom: 7px;
 }
+.backup-label { margin-top: 14px; }
 .train-list {
   display: flex; flex-direction: column;
   border-radius: 3px; overflow: hidden;

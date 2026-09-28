@@ -45,6 +45,14 @@ export function Controls({ direction, destination, onDirectionChange, onDestinat
         >
           Reading
         </button>
+        <button
+          type="button"
+          className={`toggle-btn ${destination === 'BEF' ? 'active' : ''}`}
+          aria-pressed={destination === 'BEF'}
+          onClick={() => onDestinationChange('BEF')}
+        >
+          Beaconsfield
+        </button>
       </div>
     </div>
   )
