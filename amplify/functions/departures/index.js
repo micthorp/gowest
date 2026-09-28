@@ -56,20 +56,43 @@ function delayMins(scheduled, actual) {
   }
 }
 
-function nowLondonISO() {
-  return new Date().toLocaleString('sv-SE', { timeZone: 'Europe/London' }).replace(' ', 'T')
+function londonISO(date) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const get = (type) => parts.find((p) => p.type === type)?.value
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`
+}
+
+function extractServices(rttData) {
+  if (Array.isArray(rttData?.services)) return rttData.services
+  if (Array.isArray(rttData?.location?.services)) return rttData.location.services
+  return []
 }
 
 async function fetchServices(accessToken, from, to) {
+  const timeFrom = londonISO(new Date())
+  const timeTo = londonISO(new Date(Date.now() + 120 * 60_000))
   const url = new URL(`${RTT_BASE}/gb-nr/location`)
   url.searchParams.set('code', from)
   url.searchParams.set('filterTo', to)
-  url.searchParams.set('timeWindow', '120')
-  url.searchParams.set('timeFrom', nowLondonISO())
+  url.searchParams.set('timeFrom', timeFrom)
+  url.searchParams.set('timeTo', timeTo)
 
   const rttRes = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
   })
+
+  if (rttRes.status === 204) {
+    return { trains: [], rttDebug: { status: 204, from, to, timeFrom, timeTo } }
+  }
 
   if (!rttRes.ok) {
     const text = await rttRes.text()
@@ -78,9 +101,20 @@ async function fetchServices(accessToken, from, to) {
   }
 
   const rttData = await rttRes.json()
-  const services = rttData.services ?? []
+  const services = extractServices(rttData)
+  const rttDebug = {
+    status: rttRes.status,
+    from,
+    to,
+    timeFrom,
+    timeTo,
+    serviceCount: services.length,
+    keys: rttData && typeof rttData === 'object' ? Object.keys(rttData) : [],
+    query: rttData?.query ?? null,
+  }
+  console.log('RTT location', JSON.stringify(rttDebug))
 
-  return services.slice(0, 8).map((s) => {
+  const trains = services.slice(0, 8).map((s) => {
     const dep = s.temporalData?.departure
     const plat = s.locationMetadata?.platform
     const sched = dep?.scheduleAdvertised
@@ -114,6 +148,7 @@ async function fetchServices(accessToken, from, to) {
         : destLocation?.crs === 'PAD' && to !== 'PAD',
     }
   })
+  return { trains, rttDebug }
 }
 
 export async function handler(event) {
@@ -146,24 +181,31 @@ export async function handler(event) {
     const accessToken = await getAccessToken(refreshToken)
 
     let trains
+    let rttDebug
     if (from === 'ZFD') {
-      const [zfdTrains, padTrains] = await Promise.all([
+      const [zfd, pad] = await Promise.all([
         fetchServices(accessToken, 'ZFD', to),
         fetchServices(accessToken, 'PAD', to),
       ])
-      trains = [...zfdTrains, ...padTrains].sort((a, b) => {
+      trains = [...zfd.trains, ...pad.trains].sort((a, b) => {
         const [ah, am] = a.estimatedDeparture.split(':').map(Number)
         const [bh, bm] = b.estimatedDeparture.split(':').map(Number)
         return (ah * 60 + am) - (bh * 60 + bm)
       })
+      rttDebug = { zfd: zfd.rttDebug, pad: pad.rttDebug }
     } else {
-      trains = await fetchServices(accessToken, from, to)
+      const result = await fetchServices(accessToken, from, to)
+      trains = result.trains
+      rttDebug = result.rttDebug
     }
+
+    const body = { trains, fetchedAt: new Date().toISOString() }
+    if (trains.length === 0) body.rttDebug = rttDebug
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ trains, fetchedAt: new Date().toISOString() }),
+      body: JSON.stringify(body),
     }
   } catch (err) {
     console.error('Handler error', err)
