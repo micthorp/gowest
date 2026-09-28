@@ -1,10 +1,10 @@
 const ALLOWED_STATIONS = new Set(['ZFD', 'PAD', 'MAI', 'RDG', 'MYB', 'BEF'])
 const RTT_BASE = 'https://data.rtt.io'
 
-let cachedAccessToken: string | null = null
-let cachedTokenExpiry: number | null = null
+let cachedAccessToken = null
+let cachedTokenExpiry = null
 
-async function getAccessToken(refreshToken: string): Promise<string> {
+async function getAccessToken(refreshToken) {
   if (cachedAccessToken && cachedTokenExpiry && Date.now() < cachedTokenExpiry - 60_000) {
     return cachedAccessToken
   }
@@ -13,14 +13,14 @@ async function getAccessToken(refreshToken: string): Promise<string> {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${refreshToken}` },
   })
   if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`)
-  const data = await res.json() as { token?: string; validUntil?: string }
-  if (!data.token) throw new Error('Token exchange returned no token')
+  const data = await res.json()
+  if (!data?.token) throw new Error('Token exchange returned no token')
   cachedAccessToken = data.token
   cachedTokenExpiry = data.validUntil ? new Date(data.validUntil).getTime() : Date.now() + 50 * 60_000
   return cachedAccessToken
 }
 
-function typicalDuration(operator: string, from: string, to: string): number | undefined {
+function typicalDuration(operator, from, to) {
   if ((from === 'MYB' && to === 'BEF') || (from === 'BEF' && to === 'MYB')) return 27
   if (from === 'PAD' || from === 'ZFD') {
     if (to === 'MAI') return operator === 'GWR' ? 23 : 47
@@ -33,33 +33,39 @@ function typicalDuration(operator: string, from: string, to: string): number | u
   return undefined
 }
 
-function toHHMM(isoString: string | undefined): string {
+function toHHMM(isoString) {
   if (!isoString) return ''
   try {
-    const d = new Date(isoString)
-    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })
-  } catch { return '' }
+    return new Date(isoString).toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/London',
+    })
+  } catch {
+    return ''
+  }
 }
 
-function delayMins(scheduled: string | undefined, actual: string | undefined): number {
+function delayMins(scheduled, actual) {
   if (!scheduled || !actual) return 0
   try {
     const diff = Math.round((new Date(actual).getTime() - new Date(scheduled).getTime()) / 60000)
     return diff > 0 ? diff : 0
-  } catch { return 0 }
+  } catch {
+    return 0
+  }
 }
 
-function nowLondonISO(): string {
+function nowLondonISO() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Europe/London' }).replace(' ', 'T')
 }
 
-async function fetchServices(accessToken: string, from: string, to: string) {
-  const timeFrom = nowLondonISO()
+async function fetchServices(accessToken, from, to) {
   const url = new URL(`${RTT_BASE}/gb-nr/location`)
   url.searchParams.set('code', from)
   url.searchParams.set('filterTo', to)
   url.searchParams.set('timeWindow', '120')
-  url.searchParams.set('timeFrom', timeFrom)
+  url.searchParams.set('timeFrom', nowLondonISO())
 
   const rttRes = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
@@ -71,55 +77,46 @@ async function fetchServices(accessToken: string, from: string, to: string) {
     throw new Error(`RTT API error: ${rttRes.status}`)
   }
 
-  const rttData = await rttRes.json() as { services?: Record<string, unknown>[] }
+  const rttData = await rttRes.json()
   const services = rttData.services ?? []
 
-  return services
-    .slice(0, 8)
-    .map((s: any) => {
-      const dep = s.temporalData?.departure
-      const plat = s.locationMetadata?.platform
-      const sched = dep?.scheduleAdvertised
-      const actual = dep?.realtimeEstimate ?? dep?.realtimeForecast ?? dep?.realtimeActual
-      const schedDep = toHHMM(sched)
-      const estDep = toHHMM(actual) || schedDep
-      const delay = delayMins(sched, actual)
-      const destLocation = s.destination?.[0]?.location
-      const operator = s.scheduleMetadata?.operator?.code ?? 'Other'
+  return services.slice(0, 8).map((s) => {
+    const dep = s.temporalData?.departure
+    const plat = s.locationMetadata?.platform
+    const sched = dep?.scheduleAdvertised
+    const actual = dep?.realtimeEstimate ?? dep?.realtimeForecast ?? dep?.realtimeActual
+    const schedDep = toHHMM(sched)
+    const estDep = toHHMM(actual) || schedDep
+    const delay = delayMins(sched, actual)
+    const destLocation = s.destination?.[0]?.location
+    const operator = s.scheduleMetadata?.operator?.code ?? 'Other'
+    const operatorName =
+      operator === 'GW' ? 'GWR' :
+      operator === 'XR' ? 'Elizabeth' :
+      operator === 'CH' ? 'Chiltern' : 'Other'
+    const isCancelled = dep?.isCancelled === true
 
-      const operatorName =
-        operator === 'GW' ? 'GWR' :
-        operator === 'XR' ? 'Elizabeth' :
-        operator === 'CH' ? 'Chiltern' : 'Other'
-
-      const isCancelled = dep?.isCancelled === true
-      const status = isCancelled ? 'cancelled' : delay > 0 ? 'delayed' : 'on_time'
-
-      return {
-        id: s.scheduleMetadata?.uniqueIdentity ?? Math.random().toString(),
-        operator: operatorName,
-        from,
-        to,
-        scheduledDeparture: schedDep,
-        estimatedDeparture: estDep,
-        durationMinutes: typicalDuration(operatorName, from, to),
-        platform: plat?.actual ?? plat?.forecast ?? plat?.planned ?? undefined,
-        status,
-        delayMinutes: delay,
-        destinationName: destLocation?.description,
-        isFast: operatorName === 'GWR' || operatorName === 'Chiltern',
-        terminatesPaddington: Array.isArray(destLocation?.shortCodes)
-          ? destLocation.shortCodes.includes('PAD') && to !== 'PAD'
-          : destLocation?.crs === 'PAD' && to !== 'PAD',
-      }
-    })
+    return {
+      id: s.scheduleMetadata?.uniqueIdentity ?? Math.random().toString(),
+      operator: operatorName,
+      from,
+      to,
+      scheduledDeparture: schedDep,
+      estimatedDeparture: estDep,
+      durationMinutes: typicalDuration(operatorName, from, to),
+      platform: plat?.actual ?? plat?.forecast ?? plat?.planned ?? undefined,
+      status: isCancelled ? 'cancelled' : delay > 0 ? 'delayed' : 'on_time',
+      delayMinutes: delay,
+      destinationName: destLocation?.description,
+      isFast: operatorName === 'GWR' || operatorName === 'Chiltern',
+      terminatesPaddington: Array.isArray(destLocation?.shortCodes)
+        ? destLocation.shortCodes.includes('PAD') && to !== 'PAD'
+        : destLocation?.crs === 'PAD' && to !== 'PAD',
+    }
+  })
 }
 
-export const handler = async (event: {
-  httpMethod?: string
-  queryStringParameters?: Record<string, string> | null
-  requestContext?: { http?: { method?: string } }
-}) => {
+export async function handler(event) {
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -148,8 +145,7 @@ export const handler = async (event: {
   try {
     const accessToken = await getAccessToken(refreshToken)
 
-    let trains: Awaited<ReturnType<typeof fetchServices>>
-
+    let trains
     if (from === 'ZFD') {
       const [zfdTrains, padTrains] = await Promise.all([
         fetchServices(accessToken, 'ZFD', to),

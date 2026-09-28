@@ -1,5 +1,3 @@
-'use strict'
-
 const ALLOWED_STATIONS = new Set(['ZFD', 'PAD', 'MAI', 'RDG', 'MYB', 'BEF'])
 const RTT_BASE = 'https://data.rtt.io'
 
