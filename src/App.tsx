@@ -60,12 +60,18 @@ export default function App() {
     }
   }
 
-  const load = useCallback(async (dir: Direction, dest: Destination, isManual = false) => {
+  const load = useCallback(async (dir: Direction, dest: Destination, mode: 'auto' | 'manual' | 'silent' = 'auto') => {
     inflightRef.current?.abort()
     const controller = new AbortController()
     inflightRef.current = controller
 
-    if (isManual) setLoading(true)
+    if (mode !== 'silent') setLoading(true)
+    if (mode === 'auto') {
+      setTrains([])
+      setBackupTrains([])
+      setRecommendation(null)
+      setDisruptionMessage(null)
+    }
     setError(null)
 
     try {
@@ -145,7 +151,7 @@ export default function App() {
 
   useEffect(() => {
     load(direction, destination)
-    const timer = setInterval(() => load(direction, destination), REFRESH_INTERVAL)
+    const timer = setInterval(() => load(direction, destination, 'silent'), REFRESH_INTERVAL)
     return () => {
       clearInterval(timer)
       inflightRef.current?.abort()
@@ -160,7 +166,7 @@ export default function App() {
     setDestination(d)
     persist(direction, d)
   }
-  const handleRefresh = () => load(direction, destination, true)
+  const handleRefresh = () => load(direction, destination, 'manual')
 
   const staleMessage = lastUpdated
     ? `Live data unavailable. Showing last successful update from ${lastUpdated}.`
@@ -203,7 +209,7 @@ export default function App() {
         )}
         <div className="section-label">Next useful departures</div>
         <TrainList trains={trains} bestId={recommendation?.bestTrain?.id ?? null} />
-        {showChilternBackup && (
+        {showChilternBackup && (backupTrains.length > 0 || (!loading && lastUpdated)) && (
           <>
             <div className="section-label backup-label">{backupLabel}</div>
             <TrainList trains={backupTrains} bestId={recommendation?.bestTrain?.id ?? null} />
