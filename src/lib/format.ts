@@ -11,7 +11,7 @@ export function formatTime(iso: string): string {
 }
 
 export function formatDuration(mins?: number): string {
-  if (!mins) return '?m'
+  if (mins == null) return '?m'
   return `${mins}m`
 }
 

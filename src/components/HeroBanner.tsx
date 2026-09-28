@@ -1,6 +1,6 @@
 export function HeroBanner() {
   return (
-    <div className="hero">
+    <div className="hero" aria-hidden="true">
       <div className="hero-left" />
       <div className="hero-right" />
 

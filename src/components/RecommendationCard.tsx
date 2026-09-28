@@ -1,11 +1,13 @@
 import type { TrainOption } from '../lib/stations'
 import type { DecisionLabel } from '../lib/stations'
 import { formatTime, formatDuration, operatorLabel, statusLabel } from '../lib/format'
+import { estimatedArrivalHHMM } from '../lib/decision'
 import { STATIONS } from '../lib/stations'
 
 interface Props {
   label: DecisionLabel
   train: TrainOption | null
+  detail?: string
 }
 
 function decisionClass(label: DecisionLabel): string {
@@ -14,7 +16,7 @@ function decisionClass(label: DecisionLabel): string {
   return 'rec-decision'
 }
 
-export function RecommendationCard({ label, train }: Props) {
+export function RecommendationCard({ label, train, detail }: Props) {
   if (!train) {
     return (
       <div className="rec-card">
@@ -27,15 +29,8 @@ export function RecommendationCard({ label, train }: Props) {
 
   const opClass = train.operator === 'GWR' ? 'op-gwr' : 'op-eliz'
   const destName = STATIONS[train.to]?.name ?? train.to
-  const estimatedArrival = (() => {
-  if (train.estimatedArrival) return train.estimatedArrival
-  if (train.estimatedDeparture && train.durationMinutes) {
-    const [h, m] = train.estimatedDeparture.split(':').map(Number)
-    const total = h * 60 + m + train.durationMinutes
-    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-  }
-  return null
-})()
+  const estimatedArrival = estimatedArrivalHHMM(train)
+
   return (
     <div className="rec-card">
       <div className="rec-label">Best option now</div>
@@ -50,6 +45,7 @@ export function RecommendationCard({ label, train }: Props) {
       <div className="rec-meta">
         Arrives {destName} {estimatedArrival ?? '--:--'}
       </div>
+      {detail && <div className="rec-detail">{detail}</div>}
       <div className="rec-pills">
         <span className={`pill ${train.isFast ? 'pill-fast' : 'pill-slow'}`}>
           {train.isFast ? 'Fast' : 'Stopping'}
@@ -60,7 +56,7 @@ export function RecommendationCard({ label, train }: Props) {
         <span className={`pill ${train.status === 'on_time' ? 'pill-ontime' : 'pill-delayed'}`}>
           {statusLabel(train)}
         </span>
-        {train.durationMinutes && (
+        {train.durationMinutes != null && (
           <span className="pill pill-plat">{formatDuration(train.durationMinutes)}</span>
         )}
       </div>

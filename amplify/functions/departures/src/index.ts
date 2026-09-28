@@ -73,7 +73,6 @@ async function fetchServices(accessToken: string, from: string, to: string) {
   const services = rttData.services ?? []
 
   return services
-    .filter((s: any) => s.temporalData?.departure?.isCancelled !== true)
     .slice(0, 8)
     .map((s: any) => {
       const dep = s.temporalData?.departure
@@ -88,8 +87,7 @@ async function fetchServices(accessToken: string, from: string, to: string) {
 
       const operatorName =
         operator === 'GW' ? 'GWR' :
-        operator === 'XR' ? 'Elizabeth' :
-        operator === 'TL' ? 'Elizabeth' : 'Other'
+        operator === 'XR' ? 'Elizabeth' : 'Other'
 
       const isCancelled = dep?.isCancelled === true
       const status = isCancelled ? 'cancelled' : delay > 0 ? 'delayed' : 'on_time'
@@ -106,8 +104,10 @@ async function fetchServices(accessToken: string, from: string, to: string) {
         status,
         delayMinutes: delay,
         destinationName: destLocation?.description,
-        isFast: true,
-        terminatesPaddington: destLocation?.shortCodes?.includes('PAD') && to !== 'PAD',
+        isFast: operatorName === 'GWR',
+        terminatesPaddington: Array.isArray(destLocation?.shortCodes)
+          ? destLocation.shortCodes.includes('PAD') && to !== 'PAD'
+          : destLocation?.crs === 'PAD' && to !== 'PAD',
       }
     })
 }
@@ -161,7 +161,7 @@ export const handler = async (event: {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ trains }),
+      body: JSON.stringify({ trains, fetchedAt: new Date().toISOString() }),
     }
   } catch (err) {
     console.error('Handler error', err)

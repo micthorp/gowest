@@ -19,6 +19,18 @@ body {
   min-height: 100vh;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .app {
   max-width: 400px;
   margin: 0 auto;
@@ -125,6 +137,13 @@ body {
 .rec-op  { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; }
 .rec-time { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--gw-text); }
 .rec-meta { font-size: 12px; color: var(--gw-muted); margin-top: 3px; }
+.rec-detail {
+  font-size: 13px;
+  color: var(--gw-text);
+  margin-top: 8px;
+  letter-spacing: 0.3px;
+  line-height: 1.35;
+}
 .rec-pills { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 
 /* ── Operator badges ── */
@@ -168,6 +187,21 @@ body {
 }
 .train-row:last-child { border-bottom: none; }
 .train-row.best { border-left: 3px solid var(--gw-gold); padding-left: 8px; }
+.train-empty { grid-column: 1 / -1; color: var(--gw-muted); font-size: 12px; }
+.train-op-row { display: flex; align-items: center; gap: 5px; margin-bottom: 2px; flex-wrap: wrap; }
+.change-badge {
+  font-size: 9px; font-weight: 700; padding: 1px 5px;
+  border-radius: 2px; background: #2a1e00;
+  color: var(--gw-gold); border: 1px solid var(--gw-gold);
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
+.term-badge {
+  font-size: 9px; font-weight: 700; padding: 1px 5px;
+  border-radius: 2px; background: #1a0808;
+  color: #e07b39; border: 1px solid #e07b39;
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
+.train-status-wrap { text-align: right; }
 .train-depart { font-family: 'DM Mono', monospace; font-size: 17px; font-weight: 500; color: var(--gw-text); }
 .train-route  { font-size: 14px; color: var(--gw-muted); margin-top: 2px; }
 .train-arr    { font-size: 13px; color: var(--gw-muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
