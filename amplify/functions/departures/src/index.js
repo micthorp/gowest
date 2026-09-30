@@ -35,10 +35,17 @@ function typicalDuration(operator, from, to) {
 
 function toHHMM(isoString) {
   if (!isoString) return ''
+  const trimmed = String(isoString).trim()
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed
+  // GBTT clock time: do not timezone-convert. Lambda is UTC, so Date('…T20:38Z')
+  // plus Europe/London would show 21:38 in BST.
+  const match = trimmed.match(/T(\d{2}):(\d{2})/)
+  if (match) return `${match[1]}:${match[2]}`
   try {
-    return new Date(isoString).toLocaleTimeString('en-GB', {
+    return new Date(trimmed).toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
+      hourCycle: 'h23',
       timeZone: 'Europe/London',
     })
   } catch {
