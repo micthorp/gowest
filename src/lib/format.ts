@@ -1,13 +1,9 @@
 import type { TrainOption, TrainStatus, OperatorCode } from './stations'
+import { advertisedTimeToHHMM } from './time'
 
 export function formatTime(iso: string): string {
   if (!iso) return '--:--'
-  if (/^\d{2}:\d{2}$/.test(iso)) return iso
-  try {
-    return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  } catch {
-    return iso
-  }
+  return advertisedTimeToHHMM(iso) || iso
 }
 
 export function formatDuration(mins?: number): string {

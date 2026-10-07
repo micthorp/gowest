@@ -28,3 +28,29 @@ export function addMinutesToHHMM(hhmm: string, duration: number): string | null 
 export function compareBoardTimes(a: string, b: string): number {
   return boardMinutes(a) - boardMinutes(b)
 }
+
+/**
+ * Public timetable (GBTT) clock time from an RTT ISO datetime.
+ *
+ * Lambda runs in UTC. `new Date('2026-09-30T20:38:00')` or `...Z` is treated as
+ * 20:38 UTC, then converting to Europe/London in BST shows 21:38. RTT's
+ * advertised fields use London wall-clock digits, so take HH:MM from the
+ * timestamp string instead of timezone-converting.
+ */
+export function advertisedTimeToHHMM(value: string): string {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed
+  const match = trimmed.match(/T(\d{2}):(\d{2})/)
+  if (match) return `${match[1]}:${match[2]}`
+  try {
+    return new Date(trimmed).toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone: 'Europe/London',
+    })
+  } catch {
+    return trimmed
+  }
+}
