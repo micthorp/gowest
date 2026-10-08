@@ -84,6 +84,18 @@ function extractServices(rttData) {
   return []
 }
 
+function reasonTexts(reasons) {
+  if (!Array.isArray(reasons)) return []
+  const out = []
+  for (const r of reasons) {
+    const text = r?.longText || r?.shortText
+    if (typeof text === 'string' && text.trim() && !out.includes(text.trim())) {
+      out.push(text.trim())
+    }
+  }
+  return out.slice(0, 3)
+}
+
 async function fetchServices(accessToken, from, to) {
   const timeFrom = londonISO(new Date())
   const timeTo = londonISO(new Date(Date.now() + 120 * 60_000))
@@ -98,7 +110,7 @@ async function fetchServices(accessToken, from, to) {
   })
 
   if (rttRes.status === 204) {
-    return { trains: [], rttDebug: { status: 204, from, to, timeFrom, timeTo } }
+    return { trains: [], alerts: [], rttDebug: { status: 204, from, to, timeFrom, timeTo } }
   }
 
   if (!rttRes.ok) {
@@ -120,6 +132,7 @@ async function fetchServices(accessToken, from, to) {
     query: rttData?.query ?? null,
   }
   console.log('RTT location', JSON.stringify(rttDebug))
+  const alerts = reasonTexts(rttData.reasons)
 
   const trains = services.slice(0, 8).map((s) => {
     const dep = s.temporalData?.departure
@@ -155,7 +168,7 @@ async function fetchServices(accessToken, from, to) {
         : destLocation?.crs === 'PAD' && to !== 'PAD',
     }
   })
-  return { trains, rttDebug }
+  return { trains, rttDebug, alerts }
 }
 
 export async function handler(event) {
@@ -189,6 +202,7 @@ export async function handler(event) {
 
     let trains
     let rttDebug
+    let alerts = []
     if (from === 'ZFD') {
       const [zfd, pad] = await Promise.all([
         fetchServices(accessToken, 'ZFD', to),
@@ -200,13 +214,15 @@ export async function handler(event) {
         return (ah * 60 + am) - (bh * 60 + bm)
       })
       rttDebug = { zfd: zfd.rttDebug, pad: pad.rttDebug }
+      alerts = [...new Set([...(zfd.alerts || []), ...(pad.alerts || [])])]
     } else {
       const result = await fetchServices(accessToken, from, to)
       trains = result.trains
       rttDebug = result.rttDebug
+      alerts = result.alerts || []
     }
 
-    const body = { trains, fetchedAt: new Date().toISOString() }
+    const body = { trains, fetchedAt: new Date().toISOString(), alerts }
     if (trains.length === 0) body.rttDebug = rttDebug
 
     return {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRecommendation, sortAndFilterTrains, withChilternBackup } from './decision'
+import { disruptionAlert, getRecommendation, sortAndFilterTrains, withChilternBackup } from './decision'
 import type { TrainOption } from './stations'
 
 function train(partial: Partial<TrainOption> & Pick<TrainOption, 'id' | 'operator' | 'from' | 'estimatedDeparture'>): TrainOption {
@@ -150,5 +150,38 @@ describe('sortAndFilterTrains', () => {
       train({ id: 'cx', operator: 'GWR', from: 'PAD', estimatedDeparture: '17:50', status: 'cancelled' }),
     ]
     expect(sortAndFilterTrains(allCx).map(t => t.id)).toEqual(['cx'])
+  })
+})
+
+describe('disruptionAlert', () => {
+  it('flags a missing Elizabeth line when GWR is still running', () => {
+    const trains: TrainOption[] = [
+      train({ id: 'g1', operator: 'GWR', from: 'PAD', estimatedDeparture: '06:20', durationMinutes: 23, isFast: true }),
+      train({ id: 'g2', operator: 'GWR', from: 'PAD', estimatedDeparture: '06:38', durationMinutes: 23, isFast: true }),
+      train({ id: 'g3', operator: 'GWR', from: 'PAD', estimatedDeparture: '07:20', durationMinutes: 23, isFast: true }),
+    ]
+    expect(disruptionAlert(trains, 'MAI')).toBe(
+      'Elizabeth line: no services in this window. GWR is still running.'
+    )
+  })
+
+  it('flags cancelled Elizabeth even if GWR is fine', () => {
+    const trains: TrainOption[] = [
+      train({ id: 'e1', operator: 'Elizabeth', from: 'ZFD', estimatedDeparture: '06:00', status: 'cancelled' }),
+      train({ id: 'e2', operator: 'Elizabeth', from: 'ZFD', estimatedDeparture: '06:15', status: 'cancelled' }),
+      train({ id: 'g1', operator: 'GWR', from: 'PAD', estimatedDeparture: '06:20', durationMinutes: 23, isFast: true }),
+      train({ id: 'g2', operator: 'GWR', from: 'PAD', estimatedDeparture: '06:38', durationMinutes: 23, isFast: true }),
+    ]
+    expect(disruptionAlert(trains, 'MAI')).toBe(
+      'Elizabeth line services are cancelled. GWR is still running.'
+    )
+  })
+
+  it('does not alert when both operators are running', () => {
+    const trains: TrainOption[] = [
+      train({ id: 'e1', operator: 'Elizabeth', from: 'ZFD', estimatedDeparture: '17:44', durationMinutes: 53 }),
+      train({ id: 'g1', operator: 'GWR', from: 'PAD', estimatedDeparture: '17:42', durationMinutes: 23, isFast: true }),
+    ]
+    expect(disruptionAlert(trains, 'MAI')).toBeNull()
   })
 })
