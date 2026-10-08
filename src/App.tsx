@@ -5,7 +5,7 @@ import { RecommendationCard } from './components/RecommendationCard'
 import { TrainList } from './components/TrainList'
 import { StatusBanner } from './components/StatusBanner'
 import { fetchDepartures } from './lib/api'
-import { getRecommendation, sortAndFilterTrains, withChilternBackup } from './lib/decision'
+import { disruptionAlert, getRecommendation, sortAndFilterTrains, withChilternBackup } from './lib/decision'
 import { nowTimestamp } from './lib/format'
 import {
   chilternBackupRoute,
@@ -125,16 +125,9 @@ export default function App() {
       setLastUpdated(nowTimestamp())
       setStale(false)
 
-      const allBad = data.trains.length > 0 && data.trains.every(t => t.status === 'cancelled')
-      const manyDelayed = data.trains.filter(t => t.status === 'delayed').length >= 2
-      if (allBad) {
-        setDisruptionMessage(
-          rec.label === 'Use Chiltern via Marylebone'
-            ? 'Paddington corridor unavailable. Chiltern via Marylebone is the backup.'
-            : 'All services cancelled or unavailable.'
-        )
-      } else if (manyDelayed) {
-        setDisruptionMessage('Multiple delays reported. Check Chiltern via Marylebone below.')
+      const alert = disruptionAlert(data.trains, dest, data.alerts ?? [])
+      if (alert) {
+        setDisruptionMessage(alert)
       } else if (rec.label === 'Use Chiltern via Marylebone') {
         setDisruptionMessage('Paddington corridor looks poor. Chiltern via Marylebone is the backup.')
       } else {

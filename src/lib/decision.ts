@@ -139,10 +139,13 @@ export function getRecommendation(
   }
 
   if (gwrFromPad[0]) {
+    const elizCancelled = trains.some(t => t.operator === 'Elizabeth' && t.status === 'cancelled')
     return {
       label: 'Check Paddington departures',
       bestTrain: gwrFromPad[0],
-      detail: 'No Elizabeth feeder from Farringdon in this window — GWR may not be catchable.',
+      detail: elizCancelled
+        ? 'Elizabeth line services are cancelled. Next GWR from Paddington.'
+        : 'No Elizabeth feeder from Farringdon in this window — GWR may not be catchable.',
     }
   }
 
@@ -171,6 +174,71 @@ export function withChilternBackup(
       ? 'Paddington corridor looks poor. Next Chiltern from Marylebone to Beaconsfield.'
       : 'Paddington corridor looks poor. Next Chiltern from Beaconsfield to Marylebone.',
   }
+}
+
+function runningBy(trains: TrainOption[], operator: TrainOption['operator']): TrainOption[] {
+  return trains.filter(t => t.operator === operator && t.status !== 'cancelled')
+}
+
+function cancelledBy(trains: TrainOption[], operator: TrainOption['operator']): TrainOption[] {
+  return trains.filter(t => t.operator === operator && t.status === 'cancelled')
+}
+
+/**
+ * In-app alert for a wiped-out operator. RTT often omits cancelled trains
+ * entirely, so "zero Elizabeth + several GWR" is the Wednesday engineering case.
+ */
+export function disruptionAlert(
+  trains: TrainOption[],
+  destination: Destination,
+  rttAlerts: string[] = []
+): string | null {
+  if (destination === 'BCF') {
+    const running = runningBy(trains, 'Chiltern')
+    const cancelled = cancelledBy(trains, 'Chiltern')
+    if (running.length === 0 && cancelled.length >= 2) {
+      return 'Chiltern services are cancelled in this window.'
+    }
+    if (cancelled.length >= 2) {
+      return 'Multiple Chiltern cancellations. Check before travelling.'
+    }
+    const delayed = trains.filter(t => t.status === 'delayed').length
+    if (delayed >= 2) return 'Multiple delays reported. Check before travelling.'
+    return rttAlerts[0] ?? null
+  }
+
+  const elizRun = runningBy(trains, 'Elizabeth')
+  const gwrRun = runningBy(trains, 'GWR')
+  const elizCx = cancelledBy(trains, 'Elizabeth')
+  const gwrCx = cancelledBy(trains, 'GWR')
+
+  const elizMissing = elizRun.length === 0 && elizCx.length === 0
+  const gwrMissing = gwrRun.length === 0 && gwrCx.length === 0
+
+  if (elizRun.length === 0 && gwrRun.length === 0 && trains.length > 0) {
+    return 'Paddington / Elizabeth corridor looks down. Check Chiltern via Marylebone.'
+  }
+
+  // No Elizabeth at all, but GWR is running — typical of an Elizabeth shutdown
+  // where cancelled XR services never appear in the RTT location feed.
+  if (elizRun.length === 0 && gwrRun.length >= 2 && (elizMissing || elizCx.length > 0)) {
+    return elizCx.length > 0
+      ? 'Elizabeth line services are cancelled. GWR is still running.'
+      : 'Elizabeth line: no services in this window. GWR is still running.'
+  }
+
+  if (gwrRun.length === 0 && elizRun.length >= 2 && (gwrMissing || gwrCx.length > 0)) {
+    return gwrCx.length > 0
+      ? 'GWR services are cancelled. Elizabeth line is still running.'
+      : 'No GWR in this window. Elizabeth line is still running.'
+  }
+
+  const delayed = trains.filter(t => t.status === 'delayed').length
+  if (delayed >= 2) {
+    return 'Multiple delays reported. Check before moving.'
+  }
+
+  return rttAlerts[0] ?? null
 }
 
 export function sortAndFilterTrains(trains: TrainOption[]): TrainOption[] {

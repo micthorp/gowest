@@ -63,4 +63,6 @@ For homebound journeys (Farringdon → Maidenhead/Reading):
 
 On Maidenhead/Reading views, the next Chiltern services are always listed as a backup. If the Paddington corridor has nothing usable, the main recommendation switches to **Use Chiltern via Marylebone**.
 
+If Elizabeth or GWR is wiped out (or missing from the feed, which is how RTT often represents mass cancellations), a red banner calls that out even when the other operator is still running.
+
 Selecting **Beaconsfield** shows the Chiltern corridor on its own (Marylebone ↔ Beaconsfield).

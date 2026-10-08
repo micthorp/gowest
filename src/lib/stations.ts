@@ -48,6 +48,8 @@ export interface DeparturesResponse {
   trains: TrainOption[]
   fetchedAt: string
   error?: string
+  /** Delay/cancellation reason text from RTT, if any. */
+  alerts?: string[]
 }
 
 export function isChilternDestination(destination: Destination): boolean {
